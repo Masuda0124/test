@@ -1,112 +1,116 @@
-const STORAGE_KEY = "todo-list-items";
+const STORAGE_KEY = "task-notebook-items";
 
-const form = document.getElementById("todo-form");
-const input = document.getElementById("todo-input");
-const list = document.getElementById("todo-list");
-const itemsLeft = document.getElementById("items-left");
-const clearCompletedBtn = document.getElementById("clear-completed");
-const filterButtons = document.querySelectorAll(".filter-btn");
+const seed = [
+  { id: "seed-1", text: "見積書をA社へ再送する", done: false },
+  { id: "seed-2", text: "週次レポートをまとめる", done: false },
+  { id: "seed-3", text: "会議室を予約する", done: true },
+];
 
-let todos = loadTodos();
-let currentFilter = "all";
-
-function loadTodos() {
+function load() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (raw) return JSON.parse(raw);
   } catch {
-    return [];
+    // ignore malformed or inaccessible storage
+  }
+  return seed.slice();
+}
+
+function save(items) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // storage may be unavailable; state simply won't persist
   }
 }
 
-function saveTodos() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+let tasks = load();
+let filter = "all";
+
+const listEl = document.getElementById("task-list");
+const form = document.getElementById("add-form");
+const input = document.getElementById("new-task");
+const remainingEl = document.getElementById("remaining-count");
+const clearBtn = document.getElementById("clear-done");
+const tabs = document.querySelectorAll(".tab");
+const todayEl = document.getElementById("today");
+
+todayEl.textContent = new Intl.DateTimeFormat("ja-JP", {
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+}).format(new Date());
+
+function visible() {
+  if (filter === "active") return tasks.filter((t) => !t.done);
+  if (filter === "done") return tasks.filter((t) => t.done);
+  return tasks;
 }
 
 function render() {
-  list.innerHTML = "";
+  listEl.innerHTML = "";
+  const items = visible();
 
-  const filtered = todos.filter((todo) => {
-    if (currentFilter === "active") return !todo.completed;
-    if (currentFilter === "completed") return todo.completed;
-    return true;
-  });
-
-  if (filtered.length === 0) {
-    const empty = document.createElement("li");
-    empty.className = "empty-message";
-    empty.textContent = "タスクがありません";
-    list.appendChild(empty);
+  if (items.length === 0) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = filter === "done" ? "まだ完了した項目はありません" : "書き込みはありません";
+    listEl.appendChild(li);
   }
 
-  for (const todo of filtered) {
+  for (const task of items) {
     const li = document.createElement("li");
-    li.className = "todo-item" + (todo.completed ? " completed" : "");
-    li.dataset.id = todo.id;
+    li.className = "task" + (task.done ? " done" : "");
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = todo.completed;
-    checkbox.addEventListener("change", () => toggleTodo(todo.id));
+    const check = document.createElement("button");
+    check.type = "button";
+    check.className = "check-btn" + (task.done ? " done" : "");
+    check.setAttribute("aria-pressed", String(task.done));
+    check.setAttribute("aria-label", task.done ? "未完了に戻す" : "完了にする");
+    check.addEventListener("click", () => {
+      task.done = !task.done;
+      save(tasks);
+      render();
+    });
 
     const text = document.createElement("span");
-    text.className = "todo-text";
-    text.textContent = todo.text;
+    text.className = "task-text";
+    text.textContent = task.text;
     text.title = "クリックして編集";
-    text.addEventListener("click", () => editTodo(todo.id, text));
+    text.addEventListener("click", () => startEdit(task, text));
 
-    const deleteBtn = document.createElement("button");
-    deleteBtn.className = "delete-btn";
-    deleteBtn.textContent = "✕";
-    deleteBtn.setAttribute("aria-label", "削除");
-    deleteBtn.addEventListener("click", () => deleteTodo(todo.id));
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "remove-btn";
+    remove.setAttribute("aria-label", "削除");
+    remove.textContent = "✕";
+    remove.addEventListener("click", () => {
+      tasks = tasks.filter((t) => t.id !== task.id);
+      save(tasks);
+      render();
+    });
 
-    li.append(checkbox, text, deleteBtn);
-    list.appendChild(li);
+    li.append(check, text, remove);
+    listEl.appendChild(li);
   }
 
-  const remaining = todos.filter((t) => !t.completed).length;
-  itemsLeft.textContent = `${remaining} 件残り`;
+  const remaining = tasks.filter((t) => !t.done).length;
+  remainingEl.textContent = remaining + " 件残り";
 }
 
-function addTodo(text) {
-  todos.push({ id: Date.now().toString(), text, completed: false });
-  saveTodos();
-  render();
-}
-
-function toggleTodo(id) {
-  const todo = todos.find((t) => t.id === id);
-  if (todo) {
-    todo.completed = !todo.completed;
-    saveTodos();
-    render();
-  }
-}
-
-function deleteTodo(id) {
-  todos = todos.filter((t) => t.id !== id);
-  saveTodos();
-  render();
-}
-
-function editTodo(id, textEl) {
-  const todo = todos.find((t) => t.id === id);
-  if (!todo) return;
-
+function startEdit(task, textEl) {
   const editInput = document.createElement("input");
   editInput.type = "text";
-  editInput.value = todo.text;
-  editInput.className = "edit-input";
-  editInput.style.flex = "1";
-
+  editInput.className = "task-edit";
+  editInput.value = task.text;
   textEl.replaceWith(editInput);
   editInput.focus();
+  editInput.setSelectionRange(editInput.value.length, editInput.value.length);
 
   const commit = () => {
-    const newText = editInput.value.trim();
-    todo.text = newText || todo.text;
-    saveTodos();
+    const val = editInput.value.trim();
+    if (val) task.text = val;
+    save(tasks);
     render();
   };
 
@@ -119,24 +123,29 @@ function editTodo(id, textEl) {
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const text = input.value.trim();
-  if (!text) return;
-  addTodo(text);
+  const val = input.value.trim();
+  if (!val) return;
+  tasks.push({ id: "t" + Date.now(), text: val, done: false });
+  save(tasks);
   input.value = "";
-  input.focus();
-});
-
-clearCompletedBtn.addEventListener("click", () => {
-  todos = todos.filter((t) => !t.completed);
-  saveTodos();
   render();
 });
 
-filterButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    filterButtons.forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    currentFilter = btn.dataset.filter;
+clearBtn.addEventListener("click", () => {
+  tasks = tasks.filter((t) => !t.done);
+  save(tasks);
+  render();
+});
+
+tabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    tabs.forEach((t) => {
+      t.classList.remove("active");
+      t.setAttribute("aria-selected", "false");
+    });
+    tab.classList.add("active");
+    tab.setAttribute("aria-selected", "true");
+    filter = tab.dataset.filter;
     render();
   });
 });

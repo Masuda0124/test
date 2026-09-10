@@ -3,29 +3,37 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Todoリスト</title>
+<title>タスク帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="app">
-    <h1>Todoリスト</h1>
+  <div class="page">
+    <header class="masthead">
+      <h1>タスク帳</h1>
+      <span class="today" id="today"></span>
+    </header>
 
-    <form id="todo-form" class="todo-form">
-      <input type="text" id="todo-input" placeholder="やることを入力..." autocomplete="off" required>
-      <button type="submit">追加</button>
-    </form>
-
-    <div class="filters">
-      <button class="filter-btn active" data-filter="all">すべて</button>
-      <button class="filter-btn" data-filter="active">未完了</button>
-      <button class="filter-btn" data-filter="completed">完了済み</button>
+    <div class="tabs" role="tablist">
+      <button class="tab active" data-filter="all" role="tab" aria-selected="true">すべて</button>
+      <button class="tab" data-filter="active" role="tab" aria-selected="false">未完了</button>
+      <button class="tab" data-filter="done" role="tab" aria-selected="false">完了</button>
     </div>
 
-    <ul id="todo-list" class="todo-list"></ul>
+    <div class="sheet">
+      <form class="add-row" id="add-form">
+        <label for="new-task" class="visually-hidden">やることを入力</label>
+        <input type="text" id="new-task" placeholder="やることを書き込む…" autocomplete="off">
+        <button type="submit">追加</button>
+      </form>
 
-    <div class="footer">
-      <span id="items-left">0 件残り</span>
-      <button id="clear-completed">完了済みを削除</button>
+      <ul class="tasks" id="task-list"></ul>
+
+      <div class="tally">
+        <span id="remaining-count">0 件残り</span>
+        <button type="button" id="clear-done">完了済みを消す</button>
+      </div>
     </div>
   </div>
 
